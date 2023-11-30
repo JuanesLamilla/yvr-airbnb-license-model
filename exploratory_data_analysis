@@ -1,1 +1,17 @@
-
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Exploratory Data Analysis (EDA)\n",
+    "\n",
+    "In this stage we will explore our dataset, to help understand the nature of the data and ensure we do not run into any further on in ou  analysis\n",
+    "\n",
+    "The four stages for exploring this data are:\n",
+    "\n",
+    "1. Plotting and Visualisation of the data\n",
+    "2. Understanding Correlations and Multicollinearity\n",
+    "3. Developing Summary Statistics, Distributions and Outliers\n",
+    "4. Overview of the main issues with the dataset\n".
+   ]
