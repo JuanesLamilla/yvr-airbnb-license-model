@@ -65,3 +65,33 @@ def show_vif_values(df, dependent_variable):
     vif_df = vif_df.sort_values(by='VIF', ascending=False)
 
     return vif_df
+
+def detect_separation(X, y, threshold=1.0):
+    """
+    Checks for variables in X that can perfectly or nearly perfectly predict y.
+    
+    Parameters:
+    - X: pd.DataFrame of predictors
+    - y: pd.Series of binary target (0/1)
+    - threshold: proportion (default=1.0) for 'perfect' separation. Use <1.0 to check for near-separation.
+    
+    Returns:
+    - List of column names likely causing separation
+    """
+    problematic_cols = []
+
+    for col in X.columns:
+        if X[col].nunique() > 50:
+            continue  # Skip continuous variables for now
+
+        cross_tab = pd.crosstab(X[col], y, normalize='index')
+
+        for val in cross_tab.index:
+            # Look for cases where a category always maps to one outcome
+            if (cross_tab.loc[val] == 1).any() or (cross_tab.loc[val] == 0).any():
+                max_class_prop = cross_tab.loc[val].max()
+                if max_class_prop >= threshold:
+                    problematic_cols.append(col)
+                    break  # No need to check other values in this column
+
+    return list(set(problematic_cols))
