@@ -7,7 +7,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 import pandas as pd
 
-def drop_column_using_vif_(df, thresh=5):
+def drop_column_using_vif_(df, thresh=5, print_dropping_columns=True):
     '''
     This function is adjusted from: https://stackoverflow.com/a/51329496/4667568
 
@@ -18,6 +18,8 @@ def drop_column_using_vif_(df, thresh=5):
     :param thresh: (default 5) the threshould VIF value. If the VIF of a variable is greater than thresh, it should be removed from the dataframe
     :return: dataframe with multicollinear features removed
     '''
+    vif_history = []  # save the list for VIFs of each iteration
+
     while True:
         
         # adding a constatnt item to the data. add_constant is a function from statsmodels (see the import above)
@@ -29,6 +31,7 @@ def drop_column_using_vif_(df, thresh=5):
 
             # drop the const
             vif_df = vif_df.drop('const')
+            vif_history.append(vif_df.copy()) 
         else:
             raise ValueError("constant column 'const' not successfully added")
         
@@ -37,13 +40,17 @@ def drop_column_using_vif_(df, thresh=5):
         if vif_df.VIF.max() > thresh:
             # If there are multiple variables with the maximum VIF, choose the first one
             index_to_drop = vif_df.index[vif_df.VIF == vif_df.VIF.max()].tolist()[0]
-            print('Dropping: {} (VIF: {})'.format(index_to_drop, vif_df.loc[index_to_drop, 'VIF']))
+            if print_dropping_columns:
+                print('Dropping: {} (VIF: {})'.format(index_to_drop, vif_df.loc[index_to_drop, 'VIF']))
             df = df.drop(columns = index_to_drop)
         else:
             # No VIF is above threshold. Exit the loop
             break
 
-    return df
+    # print("Final VIFs after filtering:")
+    # print(vif_df)
+
+    return df, vif_history, vif_df
 
 
 def show_vif_values(df, dependent_variable):
@@ -81,7 +88,8 @@ def detect_separation(X, y, threshold=1.0):
     problematic_cols = []
 
     for col in X.columns:
-        if X[col].nunique() > 50:
+        # if X[col].nunique() > 50:
+        if not isinstance(X[col], pd.CategoricalDtype) or X[col].nunique() > 50:
             continue  # Skip continuous variables for now
 
         cross_tab = pd.crosstab(X[col], y, normalize='index')
