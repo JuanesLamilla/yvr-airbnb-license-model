@@ -1,3 +1,8 @@
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
+import pandas as pd
+import os
+
 # Open Toronto License data
 path = os.path.join('data', 'toronto_license_data.csv')
 licenses = pd.read_csv(path)
