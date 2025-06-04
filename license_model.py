@@ -67,6 +67,14 @@ class LicenseModel:
 
         self.listings_df = self.listings_df.drop(columns=constant_columns)
 
+        # If 'license' column exists, for all rows where 'license' is NaN, set it to 'unknown'
+        if 'license' in self.listings_df.columns:
+            self.listings_df['license'] = self.listings_df['license'].fillna('unknown')
+            # Convert 'license' column to string type
+            self.listings_df['license'] = self.listings_df['license'].astype(str)
+        else:
+            raise ValueError("The 'license' column is missing from the DataFrame. Please ensure the input file contains this column.")
+
     def create_legal_listing_column(self, print_info=False, overwrite_existing=False):
         """
         Create a 'legal_listing' column based on the license regex pattern.
@@ -87,7 +95,6 @@ class LicenseModel:
             print(self.listings_df['legal_listing'].value_counts())
 
     def remove_low_variance_columns(self, threshold=0.1, print_info=True):
-
         """
         Remove columns with low variance.
         """
