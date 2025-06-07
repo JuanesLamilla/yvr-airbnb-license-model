@@ -67,6 +67,9 @@ class LicenseModel:
 
         self.listings_df = self.listings_df.drop(columns=constant_columns)
 
+        # Drop fully duplicate rows
+        self.listings_df = self.listings_df.drop_duplicates()
+
         # If 'license' column exists, for all rows where 'license' is NaN, set it to 'unknown'
         if 'license' in self.listings_df.columns:
             self.listings_df['license'] = self.listings_df['license'].fillna('unknown')
@@ -75,7 +78,7 @@ class LicenseModel:
         else:
             raise ValueError("The 'license' column is missing from the DataFrame. Please ensure the input file contains this column.")
 
-    def create_legal_listing_column(self, print_info=False, overwrite_existing=False):
+    def create_legal_listing_column(self, print_info=False, overwrite_existing=False, remove_license_column=True):
         """
         Create a 'legal_listing' column based on the license regex pattern.
         """
@@ -88,11 +91,49 @@ class LicenseModel:
                 return
         self.listings_df['legal_listing'] = self.listings_df['license'].str.match(self.license_regex_pattern, na=False)
         self.listings_df['legal_listing'] = self.listings_df['legal_listing'].astype(bool)
-        self.listings_df = self.listings_df.drop(columns=['license'])
+
+        # Find all rows that have a duplicate license value AND the room_type is not 'Private room'
+        duplicates = self.listings_df[
+            self.listings_df.duplicated(subset='license', keep=False) &
+            (self.listings_df['room_type'] != 'Private room')
+        ]
+
+        if not duplicates.empty:
+            if print_info:
+                print("Found duplicate licenses with room_type not 'Private room'. Multiple use of license is not allowed.")
+                print("These listings will be marked as illegal:")
+                print(duplicates[['license', 'room_type']].drop_duplicates())
+            # Set legal_listing to False for these duplicates
+            self.listings_df.loc[duplicates.index, 'legal_listing'] = False
+
+        if remove_license_column:
+            self.listings_df = self.listings_df.drop(columns=['license'])
 
         if print_info:
             print("Counts of legal and illegal listings:")
             print(self.listings_df['legal_listing'].value_counts())
+
+    def remove_columns_with_many_nan_values(self, threshold=0.05, print_info=True, maintain_columns=None):
+        """
+        Remove columns with more than a certain percentage of NaN values.
+        """
+        # Calculate the threshold for dropping columns
+        threshold_count = threshold * len(self.listings_df)
+
+        # Identify columns with more than the threshold of NaN values
+        cols_to_drop = self.listings_df.columns[self.listings_df.isnull().sum() > threshold_count]
+
+        # If maintain_columns is provided, remove those columns from cols_to_drop
+        if maintain_columns is not None:
+            cols_to_drop = cols_to_drop.difference(maintain_columns)
+
+        if len(cols_to_drop) > 0:
+            self.listings_df = self.listings_df.drop(columns=cols_to_drop)
+            if print_info:
+                print(f"Removed columns with more than {threshold*100}% missing values: {cols_to_drop.tolist()}")
+        else:
+            if print_info:
+                print("No columns found with more than the specified percentage of missing values.")
 
     def remove_low_variance_columns(self, threshold=0.1, print_info=True):
         """
@@ -404,14 +445,16 @@ class LicenseModel:
 
         # Set Cook's distance threshold
         cook_threshold = 4 / len(self.listings_df)
+
+        influential_outliers = diagnosis_df[(diagnosis_df['cooks_d'] > cook_threshold) & (diagnosis_df['std_resid'] > 3)]
+        prop_outliers = round(100*(len(influential_outliers) / len(self.listings_df)),1)
+
         if print_info:
             print(f"Threshold for Cook Distance = {cook_threshold}")
 
             # How many influential outliers are there?
-            influential_outliers = diagnosis_df[(diagnosis_df['cooks_d'] > cook_threshold) & (diagnosis_df['std_resid'] > 3)]
             print(f"Number of influential outliers: {len(influential_outliers)}")
 
-            prop_outliers = round(100*(len(influential_outliers) / len(self.listings_df)),1)
             print(f"Percentage of influential outliers: {prop_outliers}%")
 
         if show_plot:
@@ -521,6 +564,7 @@ class LicenseModel:
         self.load_data()
         self.preprocess_data(print_info=print_info)
         self.create_legal_listing_column(print_info=print_info, overwrite_existing=False)
+        self.remove_columns_with_many_nan_values(print_info=print_info, maintain_columns=['legal_listing', 'price', 'bedrooms', 'bathrooms'])
         self.transform_object_columns()
         self.remove_low_variance_columns(print_info=print_info)
         self.remove_missing_values(print_info=print_info)

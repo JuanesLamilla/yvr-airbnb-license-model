@@ -4,7 +4,7 @@ import statsmodels.api as sm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
 import matplotlib.pyplot as plt
 
 class LogitModel:
@@ -84,6 +84,27 @@ class LogitModel:
         plt.legend(loc='lower right')
         plt.grid()
         plt.show()
+
+    def create_precision_recall_curve(self):
+        """
+        Create and display the Precision-Recall curve for the model.
+        """
+
+        y_scores = self.result.predict(self.X_test)
+        precision, recall, thresholds = precision_recall_curve(self.y_test, y_scores)
+        pr_auc = auc(recall, precision)
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(recall, precision, color='green', label='PR curve (area = {:.2f})'.format(pr_auc))
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curve')
+        plt.legend(loc='upper right')
+        plt.grid()
+        plt.ylim([0.0, 1.05])
+        plt.xlim([0.0, 1.0])
+        plt.show()
+
 
     def find_threshold_where_fpr(self, target_fpr=0.2):
         """
