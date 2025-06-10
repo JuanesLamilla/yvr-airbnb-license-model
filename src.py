@@ -7,17 +7,18 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 import pandas as pd
 
-def drop_column_using_vif_(df, thresh=5, print_dropping_columns=True):
+def drop_column_using_vif_(df, thresh=5, print_dropping_columns=True, exclude_columns=None):
     '''
     This function is adjusted from: https://stackoverflow.com/a/51329496/4667568
 
-    Calculates VIF each feature in a pandas dataframe, and repeatedly drop the columns with the highest VIF
+    Calculates VIF each feature in a pandas dataframe, and repeatedly drop the columns with the highest VIF, while protecting exclude_columns
     A constant must be added to variance_inflation_factor or the results will be incorrect
 
     :param df: the pandas dataframe containing only the predictor features, not the response variable
     :param thresh: (default 5) the threshould VIF value. If the VIF of a variable is greater than thresh, it should be removed from the dataframe
     :return: dataframe with multicollinear features removed
     '''
+    exclude_columns = exclude_columns or []
     vif_history = []  # save the list for VIFs of each iteration
 
     while True:
@@ -26,23 +27,28 @@ def drop_column_using_vif_(df, thresh=5, print_dropping_columns=True):
         df_with_const = add_constant(df,has_constant='add')
 
         if 'const' in df_with_const.columns:
-            vif_df = pd.Series([variance_inflation_factor(df_with_const.values, i) for i in range(df_with_const.shape[1])], name= "VIF", 
-                                index=df_with_const.columns).to_frame()
+            vif_df = pd.Series(
+                [variance_inflation_factor(df_with_const.values, i) for i in range(df_with_const.shape[1])],
+                name="VIF",
+                index=df_with_const.columns
+            ).to_frame()
 
-            # drop the const
             vif_df = vif_df.drop('const')
-            vif_history.append(vif_df.copy()) 
+            vif_history.append(vif_df.copy())
         else:
             raise ValueError("constant column 'const' not successfully added")
         
+        candidates = vif_df[(vif_df['VIF'] > thresh) & (~vif_df.index.isin(exclude_columns))]
+        
         # if the largest VIF is above the thresh, remove a variable with the largest VIF
         # If there are multiple variabels with VIF>thresh, only one of them is removed. This is because we want to keep as many variables as possible
-        if vif_df.VIF.max() > thresh:
-            # If there are multiple variables with the maximum VIF, choose the first one
-            index_to_drop = vif_df.index[vif_df.VIF == vif_df.VIF.max()].tolist()[0]
+    
+        if not candidates.empty:
+            # 只删除一个 VIF 最大的变量
+            index_to_drop = candidates['VIF'].idxmax()
             if print_dropping_columns:
-                print('Dropping: {} (VIF: {})'.format(index_to_drop, vif_df.loc[index_to_drop, 'VIF']))
-            df = df.drop(columns = index_to_drop)
+                print(f"Dropping: {index_to_drop} (VIF: {vif_df.loc[index_to_drop, 'VIF']})")
+            df = df.drop(columns=index_to_drop)
         else:
             # No VIF is above threshold. Exit the loop
             break

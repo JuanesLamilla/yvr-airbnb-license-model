@@ -14,7 +14,7 @@ from src import detect_separation, drop_column_using_vif_
 from logit_model_class import LogitModel
 
 class LicenseModel:
-    def __init__(self, city, input_file, min_nights_for_license, license_regex_pattern):
+    def __init__(self, city, input_file, min_nights_for_license, license_regex_pattern, protected_columns=None):
         """
         Initialize the model with city-specific settings.
         """
@@ -22,6 +22,7 @@ class LicenseModel:
         self.input_file = input_file
         self.min_nights_for_license = min_nights_for_license
         self.license_regex_pattern = license_regex_pattern
+        self.protected_columns = protected_columns or []  # None list as default, aiming for harmonize the columns across control groups and treatments
         self.listings_df = None
 
         self.logit_model = None
@@ -56,7 +57,8 @@ class LicenseModel:
             'maximum_nights', 'minimum_minimum_nights', 'maximum_maximum_nights', 'minimum_maximum_nights',
             'minimum_nights_avg_ntm', 'maximum_nights_avg_ntm', 'has_availability'
         ]
-        self.listings_df = self.listings_df.drop(columns=[col for col in excluded_columns if col in self.listings_df])
+        self.listings_df = self.listings_df.drop(columns=[col for col in excluded_columns if col in self.listings_df.columns and col not in self.protected_columns]
+)
 
         # Drop empty and constant columns
         self.listings_df = self.listings_df.dropna(axis=1, how='all')
@@ -99,7 +101,7 @@ class LicenseModel:
         Remove columns with low variance.
         """
         numeric_df = self.listings_df.select_dtypes(include=['float64', 'int64'])
-        low_variance_cols = numeric_df.columns[numeric_df.var() < threshold]
+        low_variance_cols = [col for col in numeric_df.columns if numeric_df[col].var() < threshold and col not in self.protected_columns]
 
         # Remove legal_listing from low variance columns if it exists
         if 'legal_listing' in low_variance_cols:
@@ -108,7 +110,7 @@ class LicenseModel:
         if len(low_variance_cols) > 0:
             self.listings_df = self.listings_df.drop(columns=low_variance_cols)
             if print_info:
-                print(f"Removed low variance columns: {low_variance_cols.tolist()}")
+                print(f"Removed low variance columns: {low_variance_cols}")
         else:
             if print_info:
                 print("No low variance columns found to remove.")
@@ -252,7 +254,8 @@ class LicenseModel:
         threshold = 0.1 * len(self.listings_df)
         
         # Identify columns with more than 10% missing values
-        columns_to_drop = nan_counts[nan_counts > threshold].index.tolist()
+        columns_to_drop = [col for col in nan_counts[nan_counts > threshold].index if col not in self.protected_columns]
+
         
         if print_info and columns_to_drop:
             print(f"Dropping columns with more than 10% missing values: {columns_to_drop}")
@@ -527,3 +530,4 @@ class LicenseModel:
         self.one_hot_encode_columns(print_info=print_info)
         self.remove_separation(print_info=print_info)
         self.detect_and_remove_multicollinearity(print_info=print_info)
+
