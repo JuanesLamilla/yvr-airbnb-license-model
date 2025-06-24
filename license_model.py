@@ -38,7 +38,7 @@ class LicenseModel:
         """
         self.listings_df = pd.read_csv(self.input_file)
 
-    def preprocess_data(self, print_info=False):
+    def preprocess_data(self, print_info=False, maintain_columns=None):
         """
         Preprocess the data: filter, clean, and transform columns.
         """
@@ -56,6 +56,11 @@ class LicenseModel:
             'maximum_nights', 'minimum_minimum_nights', 'maximum_maximum_nights', 'minimum_maximum_nights',
             'minimum_nights_avg_ntm', 'maximum_nights_avg_ntm', 'has_availability'
         ]
+
+        # If maintain_columns is provided, do not drop those columns
+        if maintain_columns is not None:
+            excluded_columns = [col for col in excluded_columns if col not in maintain_columns]
+
         self.listings_df = self.listings_df.drop(columns=[col for col in excluded_columns if col in self.listings_df])
 
         # Drop empty and constant columns
@@ -135,12 +140,16 @@ class LicenseModel:
             if print_info:
                 print("No columns found with more than the specified percentage of missing values.")
 
-    def remove_low_variance_columns(self, threshold=0.1, print_info=True):
+    def remove_low_variance_columns(self, threshold=0.1, print_info=True, maintain_columns=None):
         """
         Remove columns with low variance.
         """
         numeric_df = self.listings_df.select_dtypes(include=['float64', 'int64'])
         low_variance_cols = numeric_df.columns[numeric_df.var() < threshold]
+
+        # If maintain_columns is provided, remove those columns from low_variance_cols
+        if maintain_columns is not None:
+            low_variance_cols = low_variance_cols.difference(maintain_columns)
 
         # Remove legal_listing from low variance columns if it exists
         if 'legal_listing' in low_variance_cols:
@@ -494,7 +503,7 @@ class LicenseModel:
         self.logit_model.prepare_data(data=self.listings_df)
         self.logit_model.train_model(print_summary=print_info)
 
-    def evaluate_model(self, selected_threshold=0.5, print_info=True):
+    def evaluate_model(self, selected_threshold=0.5, print_info=True, return_types=None):
         """
         Evaluate the trained model's performance.
         """
@@ -502,7 +511,7 @@ class LicenseModel:
             print("No model has been trained yet.")
             return
 
-        self.logit_model.evaluate_model(selected_threshold=selected_threshold)
+        return self.logit_model.evaluate_model(selected_threshold=selected_threshold, print_summary=print_info, return_types=return_types)
 
 ############################################################
 # MARK: 00. XT TOOLS
