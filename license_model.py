@@ -259,6 +259,10 @@ class LicenseModel:
             print("Dropped categories:")
 
         for colname in object_columns_list:
+                if colname == 'legal_listing':
+                    # Skip the legal_listing column as it is already a boolean
+                    continue
+
                 # convert column to 'category' dtype
                 self.listings_df[colname] = self.listings_df[colname].astype('category')
 
